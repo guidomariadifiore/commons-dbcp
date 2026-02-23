@@ -16,26 +16,26 @@
  */
 package org.apache.commons.dbcp2;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Enumeration;
-import java.util.HashMap; // Added for GCI76
-import java.util.HashSet; // Added for GCI76
 import java.util.Hashtable;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Properties;
-import java.util.Set;
 import java.util.StringTokenizer;
 import java.util.function.Consumer;
 import java.util.function.Function;
-import java.util.regex.Pattern; // Added for S4248
 
 import javax.naming.Context;
 import javax.naming.Name;
@@ -47,8 +47,6 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.commons.pool2.impl.BaseObjectPoolConfig;
 import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
-
-import org.eclipse.collections.impl.list.mutable.FastList;
 
 /**
  * JNDI object factory that creates an instance of {@link BasicDataSource} that has been configured based on the
@@ -151,63 +149,54 @@ public class BasicDataSourceFactory implements ObjectFactory {
     private static final String SILENT_PROP_SINGLETON = "singleton";
     private static final String SILENT_PROP_AUTH = "auth";
 
-    // Refactored for Java 8 compatibility and GCI76
-    private static final Set<String> ALL_PROPERTY_NAMES = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
-            PROP_DEFAULT_AUTO_COMMIT, PROP_DEFAULT_READ_ONLY, PROP_DEFAULT_TRANSACTION_ISOLATION,
-            PROP_DEFAULT_CATALOG, PROP_DEFAULT_SCHEMA, PROP_CACHE_STATE, PROP_DRIVER_CLASS_NAME,
-            PROP_LIFO, PROP_MAX_TOTAL, PROP_MAX_IDLE, PROP_MIN_IDLE, PROP_INITIAL_SIZE,
+    private static final List<String> ALL_PROPERTY_NAMES = Arrays.asList(PROP_DEFAULT_AUTO_COMMIT, PROP_DEFAULT_READ_ONLY,
+            PROP_DEFAULT_TRANSACTION_ISOLATION, PROP_DEFAULT_CATALOG, PROP_DEFAULT_SCHEMA, PROP_CACHE_STATE,
+            PROP_DRIVER_CLASS_NAME, PROP_LIFO, PROP_MAX_TOTAL, PROP_MAX_IDLE, PROP_MIN_IDLE, PROP_INITIAL_SIZE,
             PROP_MAX_WAIT_MILLIS, PROP_TEST_ON_CREATE, PROP_TEST_ON_BORROW, PROP_TEST_ON_RETURN,
-            PROP_TIME_BETWEEN_EVICTION_RUNS_MILLIS, PROP_NUM_TESTS_PER_EVICTION_RUN,
-            PROP_MIN_EVICTABLE_IDLE_TIME_MILLIS, PROP_SOFT_MIN_EVICTABLE_IDLE_TIME_MILLIS,
-            PROP_EVICTION_POLICY_CLASS_NAME, PROP_TEST_WHILE_IDLE, PROP_PASSWORD, PROP_URL,
-            PROP_USER_NAME, PROP_VALIDATION_QUERY, PROP_VALIDATION_QUERY_TIMEOUT,
-            PROP_CONNECTION_INIT_SQLS, PROP_ACCESS_TO_UNDERLYING_CONNECTION_ALLOWED,
-            PROP_REMOVE_ABANDONED_ON_BORROW, PROP_REMOVE_ABANDONED_ON_MAINTENANCE,
-            PROP_REMOVE_ABANDONED_TIMEOUT, PROP_LOG_ABANDONED, PROP_ABANDONED_USAGE_TRACKING,
-            PROP_POOL_PREPARED_STATEMENTS, PROP_CLEAR_STATEMENT_POOL_ON_RETURN,
-            PROP_MAX_OPEN_PREPARED_STATEMENTS, PROP_CONNECTION_PROPERTIES,
-            PROP_MAX_CONN_LIFETIME_MILLIS, PROP_LOG_EXPIRED_CONNECTIONS, PROP_ROLLBACK_ON_RETURN,
-            PROP_ENABLE_AUTO_COMMIT_ON_RETURN, PROP_DEFAULT_QUERY_TIMEOUT, PROP_FAST_FAIL_VALIDATION,
-            PROP_DISCONNECTION_SQL_CODES, PROP_DISCONNECTION_IGNORE_SQL_CODES, PROP_JMX_NAME,
-            PROP_REGISTER_CONNECTION_MBEAN, PROP_CONNECTION_FACTORY_CLASS_NAME
-    )));
+            PROP_TIME_BETWEEN_EVICTION_RUNS_MILLIS, PROP_NUM_TESTS_PER_EVICTION_RUN, PROP_MIN_EVICTABLE_IDLE_TIME_MILLIS,
+            PROP_SOFT_MIN_EVICTABLE_IDLE_TIME_MILLIS, PROP_EVICTION_POLICY_CLASS_NAME, PROP_TEST_WHILE_IDLE, PROP_PASSWORD,
+            PROP_URL, PROP_USER_NAME, PROP_VALIDATION_QUERY, PROP_VALIDATION_QUERY_TIMEOUT, PROP_CONNECTION_INIT_SQLS,
+            PROP_ACCESS_TO_UNDERLYING_CONNECTION_ALLOWED, PROP_REMOVE_ABANDONED_ON_BORROW, PROP_REMOVE_ABANDONED_ON_MAINTENANCE,
+            PROP_REMOVE_ABANDONED_TIMEOUT, PROP_LOG_ABANDONED, PROP_ABANDONED_USAGE_TRACKING, PROP_POOL_PREPARED_STATEMENTS,
+            PROP_CLEAR_STATEMENT_POOL_ON_RETURN,
+            PROP_MAX_OPEN_PREPARED_STATEMENTS, PROP_CONNECTION_PROPERTIES, PROP_MAX_CONN_LIFETIME_MILLIS,
+            PROP_LOG_EXPIRED_CONNECTIONS, PROP_ROLLBACK_ON_RETURN, PROP_ENABLE_AUTO_COMMIT_ON_RETURN,
+            PROP_DEFAULT_QUERY_TIMEOUT, PROP_FAST_FAIL_VALIDATION, PROP_DISCONNECTION_SQL_CODES, PROP_DISCONNECTION_IGNORE_SQL_CODES,
+            PROP_JMX_NAME, PROP_REGISTER_CONNECTION_MBEAN, PROP_CONNECTION_FACTORY_CLASS_NAME);
 
     /**
      * Obsolete properties from DBCP 1.x. with warning strings suggesting new properties. LinkedHashMap will guarantee
      * that properties will be listed to output in order of insertion into map.
      */
-    // Refactored for Java 8 compatibility and GCI76
-    private static final Map<String, String> NUPROP_WARNTEXT;
+    private static final Map<String, String> NUPROP_WARNTEXT = new LinkedHashMap<>();
+
     static {
-        final Map<String, String> tempMap = new HashMap<>(); // Changed UnifiedMap to HashMap
-        tempMap.put(NUPROP_MAX_ACTIVE,
+        NUPROP_WARNTEXT.put(NUPROP_MAX_ACTIVE,
                 "Property " + NUPROP_MAX_ACTIVE + " is not used in DBCP2, use " + PROP_MAX_TOTAL + " instead. "
                         + PROP_MAX_TOTAL + " default value is " + GenericObjectPoolConfig.DEFAULT_MAX_TOTAL + ".");
-        tempMap.put(NUPROP_REMOVE_ABANDONED,
+        NUPROP_WARNTEXT.put(NUPROP_REMOVE_ABANDONED,
                 "Property " + NUPROP_REMOVE_ABANDONED + " is not used in DBCP2, use one or both of "
                         + PROP_REMOVE_ABANDONED_ON_BORROW + " or " + PROP_REMOVE_ABANDONED_ON_MAINTENANCE + " instead. "
                         + "Both have default value set to false.");
-        tempMap.put(NUPROP_MAXWAIT,
+        NUPROP_WARNTEXT.put(NUPROP_MAXWAIT,
                 "Property " + NUPROP_MAXWAIT + " is not used in DBCP2 , use " + PROP_MAX_WAIT_MILLIS + " instead. "
                         + PROP_MAX_WAIT_MILLIS + " default value is " + BaseObjectPoolConfig.DEFAULT_MAX_WAIT
                         + ".");
-        NUPROP_WARNTEXT = Collections.unmodifiableMap(tempMap);
     }
 
     /**
      * Silent Properties. These properties will not be listed as ignored - we know that they may appear in JDBC Resource
      * references, and we will not list them as ignored.
      */
-    // Refactored for Java 8 compatibility and GCI76
-    private static final Set<String> SILENT_PROPERTIES = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
-            SILENT_PROP_FACTORY,
-            SILENT_PROP_SCOPE,
-            SILENT_PROP_SINGLETON,
-            SILENT_PROP_AUTH
-    )));
+    private static final List<String> SILENT_PROPERTIES = new ArrayList<>();
 
-    // Refactored for S4248: Pre-compile the regex pattern for integer parsing
-    private static final Pattern INTEGER_PATTERN = Pattern.compile("-?\\d+");
+    static {
+        SILENT_PROPERTIES.add(SILENT_PROP_FACTORY);
+        SILENT_PROPERTIES.add(SILENT_PROP_SCOPE);
+        SILENT_PROPERTIES.add(SILENT_PROP_SINGLETON);
+        SILENT_PROPERTIES.add(SILENT_PROP_AUTH);
+
+    }
 
     private static <V> void accept(final Properties properties, final String name, final Function<String, V> parser, final Consumer<V> consumer) {
         getOptional(properties, name).ifPresent(v -> consumer.accept(parser.apply(v)));
@@ -248,9 +237,9 @@ public class BasicDataSourceFactory implements ObjectFactory {
         acceptBoolean(properties, PROP_DEFAULT_READ_ONLY, dataSource::setDefaultReadOnly);
 
         getOptional(properties, PROP_DEFAULT_TRANSACTION_ISOLATION).ifPresent(value -> {
-            final String upperCaseValue = value.toUpperCase(Locale.ROOT);
+            value = value.toUpperCase(Locale.ROOT);
             int level = PoolableConnectionFactory.UNKNOWN_TRANSACTION_ISOLATION;
-            switch (upperCaseValue) {
+            switch (value) {
             case "NONE":
                 level = Connection.TRANSACTION_NONE;
                 break;
@@ -267,12 +256,10 @@ public class BasicDataSourceFactory implements ObjectFactory {
                 level = Connection.TRANSACTION_SERIALIZABLE;
                 break;
             default:
-                // Refactored for creedengo-java:GCI28 - Optimize read file exceptions
-                // Replaced try-catch with a conditional check to avoid exception overhead
-                if (INTEGER_PATTERN.matcher(upperCaseValue).matches()) { // Check if the string is a valid integer representation
-                    level = Integer.parseInt(upperCaseValue);
-                } else {
-                    System.err.println("Could not parse defaultTransactionIsolation: " + upperCaseValue);
+                try {
+                    level = Integer.parseInt(value);
+                } catch (final NumberFormatException e) {
+                    System.err.println("Could not parse defaultTransactionIsolation: " + value);
                     System.err.println("WARNING: defaultTransactionIsolation not set");
                     System.err.println("using default value of database driver");
                     level = PoolableConnectionFactory.UNKNOWN_TRANSACTION_ISOLATION;
@@ -360,35 +347,13 @@ public class BasicDataSourceFactory implements ObjectFactory {
      * @throws SQLException When a paring exception occurs
      */
     private static Properties getProperties(final String propText) throws SQLException {
-        return parsePropertiesFromString(propText);
-    }
-
-    /**
-     * Define a new helper method to parse properties without try-catch
-     */
-    private static Properties parsePropertiesFromString(final String propText) throws SQLException {
         final Properties p = new Properties();
-        if (propText == null || propText.isEmpty()) {
-            return p; // Return empty properties for null or empty input
-        }
-
-        // Replace semicolons with newlines for parsing, as per original logic
-        final String formattedPropText = propText.replace(';', '\n');
-        final StringTokenizer tokenizer = new StringTokenizer(formattedPropText, "\n");
-
-        while (tokenizer.hasMoreTokens()) {
-            final String token = tokenizer.nextToken().trim();
-            if (token.isEmpty()) {
-                continue;
+        if (propText != null) {
+            try {
+                p.load(new ByteArrayInputStream(propText.replace(';', '\n').getBytes(StandardCharsets.ISO_8859_1)));
+            } catch (final IOException e) {
+                throw new SQLException(propText, e);
             }
-            final int equalsIndex = token.indexOf('=');
-            if (equalsIndex == -1 || equalsIndex == 0 || equalsIndex == token.length() - 1) {
-                // Conditional check: Malformed property string (no '=', or '=' at start/end)
-                throw new SQLException("Malformed connection property: '" + token + "' in string: " + propText);
-            }
-            final String key = token.substring(0, equalsIndex).trim();
-            final String value = token.substring(equalsIndex + 1).trim();
-            p.setProperty(key, value);
         }
         return p;
     }
@@ -404,7 +369,7 @@ public class BasicDataSourceFactory implements ObjectFactory {
      */
     private static List<String> parseList(final String value, final char delimiter) {
         final StringTokenizer tokenizer = new StringTokenizer(value, Character.toString(delimiter));
-        final List<String> tokens = new FastList<>(tokenizer.countTokens());
+        final List<String> tokens = new ArrayList<>(tokenizer.countTokens());
         while (tokenizer.hasMoreTokens()) {
             tokens.add(tokenizer.nextToken());
         }
@@ -451,8 +416,8 @@ public class BasicDataSourceFactory implements ObjectFactory {
         }
 
         // Check property names and log warnings about obsolete and / or unknown properties
-        final List<String> warnMessages = new FastList<>();
-        final List<String> infoMessages = new FastList<>();
+        final List<String> warnMessages = new ArrayList<>();
+        final List<String> infoMessages = new ArrayList<>();
         validatePropertyNames(ref, name, warnMessages, infoMessages);
         warnMessages.forEach(log::warn);
         infoMessages.forEach(log::info);
@@ -486,7 +451,7 @@ public class BasicDataSourceFactory implements ObjectFactory {
         final String nameString = name != null ? "Name = " + name.toString() + " " : "";
         NUPROP_WARNTEXT.forEach((propertyName, value) -> {
             final RefAddr ra = ref.get(propertyName);
-            if (ra != null && !ALL_PROPERTY_NAMES.contains(propertyName)) {
+            if (ra != null && !ALL_PROPERTY_NAMES.contains(ra.getType())) {
                 final StringBuilder stringBuilder = new StringBuilder(nameString);
                 final String propertyValue = Objects.toString(ra.getContent(), null);
                 stringBuilder.append(value).append(" You have set value of \"").append(propertyValue).append("\" for \"").append(propertyName)

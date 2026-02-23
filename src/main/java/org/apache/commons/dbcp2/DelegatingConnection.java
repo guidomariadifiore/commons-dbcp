@@ -42,7 +42,6 @@ import java.util.Properties;
 import java.util.concurrent.Executor;
 
 import org.apache.commons.dbcp2.managed.ManagedConnection;
-import org.eclipse.collections.impl.list.mutable.FastList;
 
 /**
  * A base delegating implementation of {@link Connection}.
@@ -62,6 +61,9 @@ import org.eclipse.collections.impl.list.mutable.FastList;
  * @since 2.0
  */
 public class DelegatingConnection<C extends Connection> extends AbandonedTrace implements Connection {
+
+    private static final Map<String, ClientInfoStatus> EMPTY_FAILED_PROPERTIES = Collections
+            .<String, ClientInfoStatus>emptyMap();
 
     /** My delegate {@link Connection}. */
     private volatile C connection;
@@ -678,7 +680,7 @@ public class DelegatingConnection<C extends Connection> extends AbandonedTrace i
         // DBCP-288. Not all the traced objects will be statements
         final List<AbandonedTrace> traceList = getTrace();
         if (!Utils.isEmpty(traceList)) {
-            final List<Exception> thrownList = new FastList<>();
+            final List<Exception> thrownList = new ArrayList<>();
             traceList.forEach(trace -> trace.close(thrownList::add));
             clearTrace();
             if (!thrownList.isEmpty()) {
@@ -885,7 +887,7 @@ public class DelegatingConnection<C extends Connection> extends AbandonedTrace i
         } catch (final SQLClientInfoException e) {
             throw e;
         } catch (final SQLException e) {
-            throw new SQLClientInfoException("Connection is closed.", Collections.<String, ClientInfoStatus>emptyMap(), e);
+            throw new SQLClientInfoException("Connection is closed.", EMPTY_FAILED_PROPERTIES, e);
         }
     }
 
@@ -897,7 +899,7 @@ public class DelegatingConnection<C extends Connection> extends AbandonedTrace i
         } catch (final SQLClientInfoException e) {
             throw e;
         } catch (final SQLException e) {
-            throw new SQLClientInfoException("Connection is closed.", Collections.<String, ClientInfoStatus>emptyMap(), e);
+            throw new SQLClientInfoException("Connection is closed.", EMPTY_FAILED_PROPERTIES, e);
         }
     }
 
@@ -1049,7 +1051,7 @@ public class DelegatingConnection<C extends Connection> extends AbandonedTrace i
                 if (conn.isClosed()) {
                     str = "connection is closed";
                 } else {
-                    final StringBuilder sb = new StringBuilder(128);
+                    final StringBuilder sb = new StringBuilder();
                     sb.append(hashCode());
                     final DatabaseMetaData meta = conn.getMetaData();
                     if (meta != null) {

@@ -20,6 +20,7 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Hashtable;
 import java.util.List;
 import java.util.Map;
@@ -34,7 +35,6 @@ import javax.naming.spi.ObjectFactory;
 
 import org.apache.commons.dbcp2.ListException;
 import org.apache.commons.dbcp2.Utils;
-import org.eclipse.collections.impl.list.mutable.FastList;
 
 /**
  * A JNDI ObjectFactory which creates {@link SharedPoolDataSource}s or {@link PerUserPoolDataSource}s
@@ -56,7 +56,7 @@ abstract class InstanceKeyDataSourceFactory implements ObjectFactory {
      */
     public static void closeAll() throws ListException {
         // Get iterator to loop over all instances of this data source.
-        final List<Throwable> exceptionList = new FastList<>(INSTANCE_MAP.size());
+        final List<Throwable> exceptionList = new ArrayList<>(INSTANCE_MAP.size());
         INSTANCE_MAP.entrySet().forEach(entry -> {
             // Bullet-proof to avoid anything else but problems from InstanceKeyDataSource#close().
             if (entry != null) {
@@ -84,8 +84,12 @@ abstract class InstanceKeyDataSourceFactory implements ObjectFactory {
      *            If an I/O error occurs during the deserialization of a configuration parameter.
      */
     protected static final Object deserialize(final byte[] data) throws IOException, ClassNotFoundException {
-        try (ObjectInputStream in = new ObjectInputStream(new ByteArrayInputStream(data))) {
+        ObjectInputStream in = null;
+        try {
+            in = new ObjectInputStream(new ByteArrayInputStream(data));
             return in.readObject();
+        } finally {
+            Utils.closeQuietly(in);
         }
     }
 
@@ -254,7 +258,7 @@ abstract class InstanceKeyDataSourceFactory implements ObjectFactory {
 
         refAddr = ref.get("minEvictableIdleTimeMillis");
         if (hasContent(refAddr)) {
-                            ikds.setDefaultMinEvictableIdle(toDurationFromMillis(refAddr));
+            ikds.setDefaultMinEvictableIdle(toDurationFromMillis(refAddr));
         }
 
         refAddr = ref.get("minIdlePerKey");

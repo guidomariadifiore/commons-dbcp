@@ -34,10 +34,10 @@ import java.sql.SQLType;
 import java.sql.SQLXML;
 import java.sql.Time;
 import java.sql.Timestamp;
+import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.List;
 import java.util.Objects;
-import org.eclipse.collections.impl.list.mutable.FastList;
 
 /**
  * A base delegating implementation of {@link PreparedStatement}.
@@ -181,7 +181,7 @@ public class DelegatingPreparedStatement extends DelegatingStatement implements 
         // See DBCP-10 for what could happen when ResultSets are closed twice.
         final List<AbandonedTrace> traceList = getTrace();
         if (traceList != null) {
-            final List<Exception> thrownList = FastList.newList();
+            final List<Exception> thrownList = new ArrayList<>();
             traceList.forEach(trace -> trace.close(thrownList::add));
             clearTrace();
             if (!thrownList.isEmpty()) {
