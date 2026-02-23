@@ -22,7 +22,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.ArrayList;
+import java.util.ArrayList; // Keep for other potential uses if not fully replaced, but FastList is preferred for the identified issues.
 import java.util.Collections;
 import java.util.List;
 
@@ -43,6 +43,7 @@ import org.apache.commons.pool2.KeyedObjectPool;
 import org.apache.commons.pool2.KeyedPooledObjectFactory;
 import org.apache.commons.pool2.PooledObject;
 import org.apache.commons.pool2.impl.DefaultPooledObject;
+import org.eclipse.collections.impl.list.mutable.FastList; // Added import for FastList
 
 /**
  * Implements {@link PooledConnection} that is returned by {@link DriverAdapterCPDS}.
@@ -77,7 +78,7 @@ final class PooledConnectionImpl
     /**
      * StatementEventListeners.
      */
-    private final List<StatementEventListener> statementEventListeners = Collections.synchronizedList(new ArrayList<>());
+    private final List<StatementEventListener> statementEventListeners = Collections.synchronizedList(new FastList<>());
 
     /**
      * Flag set to true, once {@link #close()} is called.
@@ -105,7 +106,7 @@ final class PooledConnectionImpl
         } else {
             this.delegatingConnection = new DelegatingConnection<>(connection);
         }
-        eventListeners = Collections.synchronizedList(new ArrayList<>());
+        eventListeners = Collections.synchronizedList(new FastList<>());
         closed = false;
     }
 
@@ -444,7 +445,7 @@ final class PooledConnectionImpl
      */
     void notifyListeners() {
         final ConnectionEvent event = new ConnectionEvent(this);
-        new ArrayList<>(eventListeners).forEach(listener -> listener.connectionClosed(event));
+        new FastList<>(eventListeners).forEach(listener -> listener.connectionClosed(event));
     }
 
     /**

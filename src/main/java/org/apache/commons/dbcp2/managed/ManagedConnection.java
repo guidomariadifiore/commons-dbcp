@@ -243,13 +243,93 @@ public class ManagedConnection<C extends Connection> extends DelegatingConnectio
         }
     }
 
+    /**
+     * Handles the case where an active transaction context already has a shared connection.
+     * This connection will use the shared connection and return its own delegate to the pool.
+     *
+     * @throws SQLException if there is an issue returning or invalidating the connection.
+     */
+    private void handleExistingSharedConnection() throws SQLException {
+        // A connection for the connection factory has already been enrolled
+        // in the transaction, replace our delegate with the enrolled connection
+        // return current connection to the pool
+        @SuppressWarnings("resource")
+        final C connection = getDelegateInternal();
+        setDelegate(null); // Clear current delegate before potentially returning it
+        if (connection != null && transactionContext.getSharedConnection() != connection) {
+            try {
+                pool.returnObject(connection);
+            } catch (final Exception e) {
+                // whatever... try to invalidate the connection
+                try {
+                    pool.invalidateObject(connection);
+                } catch (final Exception ignored) {
+                    // no big deal
+                }
+            }
+        }
+        // add a listener to the transaction context
+        transactionContext.addTransactionContextListener(new CompletionListener());
+        // Set our delegate to the shared connection. Note that this will
+        // always be of type C since it has been shared by another
+        // connection from the same pool.
+        @SuppressWarnings("unchecked")
+        final C shared = (C) transactionContext.getSharedConnection();
+        setDelegate(shared);
+        // remember that we are using a shared connection, so it can be cleared after the
+        // transaction completes
+        isSharedConnection = true;
+    }
+
+    /**
+     * Handles the case where no shared connection exists for the active transaction context.
+     * It either borrows a new connection or registers the current delegate as the shared connection.
+     *
+     * @throws SQLException if unable to acquire a new connection or register the current one.
+     */
+    private void handleNewOrRegisterConnection() throws SQLException {
+        C connection = getDelegateInternal();
+        // if our delegate is null, create one
+        if (connection == null) {
+            try {
+                // borrow a new connection from the pool
+                connection = pool.borrowObject();
+                setDelegate(connection);
+            } catch (final Exception e) {
+                throw new SQLException("Unable to acquire a new connection from the pool", e);
+            }
+        }
+        // if we have a transaction, our delegate becomes the shared delegate
+        if (transactionContext != null) {
+            // add a listener to the transaction context
+            transactionContext.addTransactionContextListener(new CompletionListener());
+            // register our connection as the shared connection
+            try {
+                transactionContext.setSharedConnection(connection);
+            } catch (final SQLException e) {
+                // transaction is hosed
+                transactionContext = null;
+                try {
+                    pool.invalidateObject(connection);
+                } catch (final Exception ignored) {
+                    // we are try but no luck
+                }
+                throw e;
+            }
+        }
+    }
+
     private void updateTransactionStatus() throws SQLException {
         // if there is an active transaction context, assure the transaction context hasn't changed
+        // Use early exit/guard clause for already correctly enlisted connections.
         if (transactionContext != null && !transactionContext.isTransactionComplete()) {
             if (transactionContext.isActive()) {
                 if (transactionContext != transactionRegistry.getActiveTransactionContext()) {
                     throw new SQLException("Connection cannot be used while enlisted in another transaction");
                 }
+                // If the current transaction context is active, not complete, and matches the global active context,
+                // this connection is already correctly enlisted. Clear cached state and return early.
+                clearCachedState();
                 return;
             }
             // transaction should have been cleared up by TransactionContextListener, but in
@@ -257,72 +337,19 @@ public class ManagedConnection<C extends Connection> extends DelegatingConnectio
             // our listener is called. In that rare case, trigger the transaction complete call now
             transactionComplete();
         }
-        // the existing transaction context ended (or we didn't have one), get the active transaction context
+
+        // At this point, either transactionContext was null/complete, or it was cleaned up by transactionComplete().
+        // Get the current active transaction context from the registry.
         transactionContext = transactionRegistry.getActiveTransactionContext();
-        // if there is an active transaction context, and it already has a shared connection, use it
+
+        // Now, determine if we need to use an existing shared connection or acquire/register a new one.
         if (transactionContext != null && transactionContext.getSharedConnection() != null) {
-            // A connection for the connection factory has already been enrolled
-            // in the transaction, replace our delegate with the enrolled connection
-            // return current connection to the pool
-            @SuppressWarnings("resource")
-            final C connection = getDelegateInternal();
-            setDelegate(null);
-            if (connection != null && transactionContext.getSharedConnection() != connection) {
-                try {
-                    pool.returnObject(connection);
-                } catch (final Exception e) {
-                    // whatever... try to invalidate the connection
-                    try {
-                        pool.invalidateObject(connection);
-                    } catch (final Exception ignored) {
-                        // no big deal
-                    }
-                }
-            }
-            // add a listener to the transaction context
-            transactionContext.addTransactionContextListener(new CompletionListener());
-            // Set our delegate to the shared connection. Note that this will
-            // always be of type C since it has been shared by another
-            // connection from the same pool.
-            @SuppressWarnings("unchecked")
-            final C shared = (C) transactionContext.getSharedConnection();
-            setDelegate(shared);
-            // remember that we are using a shared connection, so it can be cleared after the
-            // transaction completes
-            isSharedConnection = true;
+            handleExistingSharedConnection();
         } else {
-            C connection = getDelegateInternal();
-            // if our delegate is null, create one
-            if (connection == null) {
-                try {
-                    // borrow a new connection from the pool
-                    connection = pool.borrowObject();
-                    setDelegate(connection);
-                } catch (final Exception e) {
-                    throw new SQLException("Unable to acquire a new connection from the pool", e);
-                }
-            }
-            // if we have a transaction, out delegate becomes the shared delegate
-            if (transactionContext != null) {
-                // add a listener to the transaction context
-                transactionContext.addTransactionContextListener(new CompletionListener());
-                // register our connection as the shared connection
-                try {
-                    transactionContext.setSharedConnection(connection);
-                } catch (final SQLException e) {
-                    // transaction is hosed
-                    transactionContext = null;
-                    try {
-                        pool.invalidateObject(connection);
-                    } catch (final Exception ignored) {
-                        // we are try but no luck
-                    }
-                    throw e;
-                }
-            }
+            handleNewOrRegisterConnection();
         }
-        // autoCommit may have been changed directly on the underlying
-        // connection
+
+        // autoCommit may have been changed directly on the underlying connection
         clearCachedState();
     }
 }

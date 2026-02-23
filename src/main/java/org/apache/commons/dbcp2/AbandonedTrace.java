@@ -19,13 +19,13 @@ package org.apache.commons.dbcp2;
 import java.lang.ref.WeakReference;
 import java.sql.SQLException;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.function.Consumer;
 
 import org.apache.commons.pool2.TrackedUse;
+import org.eclipse.collections.impl.list.mutable.FastList;
 
 /**
  * Tracks connection usage for recovering and reporting abandoned connections.
@@ -44,7 +44,7 @@ public class AbandonedTrace implements TrackedUse, AutoCloseable {
     }
 
     /** A list of objects created by children of this object. */
-    private final List<WeakReference<AbandonedTrace>> traceList = new ArrayList<>();
+    private final List<WeakReference<AbandonedTrace>> traceList = new FastList<>();
 
     /** Last time this connection was used. */
     private volatile Instant lastUsedInstant = Instant.EPOCH;
@@ -136,7 +136,7 @@ public class AbandonedTrace implements TrackedUse, AutoCloseable {
             if (size == 0) {
                 return Collections.emptyList();
             }
-            final ArrayList<AbandonedTrace> result = new ArrayList<>(size);
+            final List<AbandonedTrace> result = new FastList<>(size);
             final Iterator<WeakReference<AbandonedTrace>> iter = traceList.iterator();
             while (iter.hasNext()) {
                 final AbandonedTrace trace = iter.next().get();

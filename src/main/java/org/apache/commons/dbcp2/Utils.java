@@ -28,6 +28,7 @@ import java.util.Properties;
 import java.util.ResourceBundle;
 import java.util.Set;
 import java.util.function.Consumer;
+import java.util.Collections; // Added for potential use in refactoring
 
 import org.apache.commons.pool2.PooledObject;
 
@@ -74,13 +75,14 @@ public final class Utils {
 
     static final String[] EMPTY_STRING_ARRAY = {};
     static {
-        DISCONNECTION_SQL_CODES = new HashSet<>();
-        DISCONNECTION_SQL_CODES.add("57P01"); // Admin shutdown
-        DISCONNECTION_SQL_CODES.add("57P02"); // Crash shutdown
-        DISCONNECTION_SQL_CODES.add("57P03"); // Cannot connect now
-        DISCONNECTION_SQL_CODES.add("01002"); // SQL92 disconnect error
-        DISCONNECTION_SQL_CODES.add("JZ0C0"); // Sybase disconnect error
-        DISCONNECTION_SQL_CODES.add("JZ0C1"); // Sybase disconnect error
+        final Set<String> tempSet = new HashSet<>();
+        tempSet.add("57P01"); // Admin shutdown
+        tempSet.add("57P02"); // Crash shutdown
+        tempSet.add("57P03"); // Cannot connect now
+        tempSet.add("01002"); // SQL92 disconnect error
+        tempSet.add("JZ0C0"); // Sybase disconnect error
+        tempSet.add("JZ0C1"); // Sybase disconnect error
+        DISCONNECTION_SQL_CODES = Collections.unmodifiableSet(tempSet);
     }
 
     /**
@@ -234,7 +236,19 @@ public final class Utils {
             return msg;
         }
         final MessageFormat mf = new MessageFormat(msg);
-        return mf.format(args, new StringBuffer(), null).toString();
+
+        // Calculate estimated capacity for StringBuffer to reduce reallocations
+        int estimatedCapacity = msg.length();
+        if (args != null) {
+            for (final Object arg : args) {
+                if (arg != null) {
+                    estimatedCapacity += String.valueOf(arg).length();
+                }
+            }
+        }
+        estimatedCapacity += 16; // Add a small buffer for potential MessageFormat overhead or safety
+
+        return mf.format(args, new StringBuffer(estimatedCapacity), null).toString();
     }
 
     /**

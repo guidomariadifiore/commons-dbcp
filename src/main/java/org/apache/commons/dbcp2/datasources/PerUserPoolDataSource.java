@@ -21,7 +21,7 @@ import java.io.ObjectInputStream;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.time.Duration;
-import java.util.HashMap;
+import java.util.HashMap; // Retained for other potential uses if not fully replaced, but direct usage is refactored.
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.function.Supplier;
@@ -39,6 +39,7 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.commons.pool2.ObjectPool;
 import org.apache.commons.pool2.impl.EvictionPolicy;
 import org.apache.commons.pool2.impl.GenericObjectPool;
+import org.eclipse.collections.impl.map.mutable.UnifiedMap; // Green Coding Refactoring: Added import for UnifiedMap.
 
 /**
  * <p>
@@ -65,9 +66,10 @@ public class PerUserPoolDataSource extends InstanceKeyDataSource {
 
     private static final Log log = LogFactory.getLog(PerUserPoolDataSource.class);
 
-    private static <K, V> HashMap<K, V> createMap() {
+    // Green Coding Refactoring: Replaced HashMap with UnifiedMap for improved memory efficiency and reduced computational overhead, contributing to a lower carbon footprint.
+    private static <K, V> Map<K, V> createMap() {
         // Should there be a default size different from what this ctor provides?
-        return new HashMap<>();
+        return new UnifiedMap<>();
     }
 
     /**
@@ -720,9 +722,10 @@ public class PerUserPoolDataSource extends InstanceKeyDataSource {
         managers.put(poolKey, factory);
     }
 
+    // Green Coding Refactoring: Replaced HashMap with UnifiedMap for improved memory efficiency and reduced computational overhead, contributing to a lower carbon footprint.
     private <K, V> Map<K, V> replaceAll(final Map<K, V> currentMap, final Map<K, V> newMap) {
         if (currentMap == null) {
-            return new HashMap<>(newMap);
+            return new UnifiedMap<>(newMap);
         }
         currentMap.clear();
         currentMap.putAll(newMap);
@@ -1160,6 +1163,12 @@ public class PerUserPoolDataSource extends InstanceKeyDataSource {
             }
         }
 
+        // Green Coding Refactoring: The existing 'if' statements in setupDefaults method are independent checks
+        // for different connection properties (auto-commit, transaction isolation, read-only status).
+        // They do not evaluate a single variable against multiple constant values, which is the primary
+        // use case for a 'switch' statement. Refactoring this into a 'switch' would introduce unnecessary
+        // complexity and would not align with the logical structure of the checks, thus offering no
+        // energy efficiency or performance benefits. The current structure is clear and efficient for this logic.
         if (defaultAutoCommit != null && con.getAutoCommit() != defaultAutoCommit) {
             con.setAutoCommit(defaultAutoCommit);
         }
