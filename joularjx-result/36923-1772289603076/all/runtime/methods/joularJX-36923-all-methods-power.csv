@@ -1,0 +1,9 @@
+java.lang.StackTraceElement.initStackTraceElements,0.0810
+java.util.HashMap.tableSizeFor,0.0810
+jdk.internal.misc.Unsafe.allocateInstance,0.0810
+jdk.internal.ref.CleanerImpl.getCleanerImpl,0.0810
+java.lang.System.identityHashCode,0.0810
+java.lang.Thread.sleepNanos0,0.0000
+java.lang.ref.Reference.waitForReferencePendingList,0.0000
+sun.nio.ch.Net.accept,0.0000
+java.io.FileInputStream.readBytes,0.0000

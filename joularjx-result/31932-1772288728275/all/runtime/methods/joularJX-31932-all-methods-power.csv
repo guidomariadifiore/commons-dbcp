@@ -1,0 +1,11 @@
+java.util.Collections$UnmodifiableCollection.forEach,0.1180
+org.apache.commons.dbcp2.managed.TestSynchronizationOrder.setup,0.1180
+org.apache.geronimo.transaction.manager.RecoveryImpl.<init>,0.1180
+java.lang.StackTraceElement.initStackTraceElements,0.1180
+java.util.stream.ReferencePipeline$2$1.accept,0.1180
+jdk.internal.misc.Unsafe.allocateInstance,0.1180
+org.apache.geronimo.transaction.manager.TransactionImpl.<init>,0.1180
+java.lang.System.arraycopy,0.1180
+java.io.FileInputStream.readBytes,0.0000
+java.lang.ref.Reference.waitForReferencePendingList,0.0000
+sun.nio.ch.Net.accept,0.0000
